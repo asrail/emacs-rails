@@ -138,6 +138,8 @@
   (interactive) (rails-rake:task "db:test:clone"))
 
 (defun rails-rake:rake-command (&optional args)
-  (rails-core:prepare-command (concat "rake " args)))
+  (if (and rails-rake-use-bundler-when-possible (file-exists-p (rails-core:file "Gemfile")))
+      (concat "bundle exec rake " args)
+    (concat "rake " args)))
 
 (provide 'rails-rake)

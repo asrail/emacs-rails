@@ -282,6 +282,7 @@ Emacs w3m browser."
         (setq buffer-read-only t)
         (goto-char (point-min))
         (local-set-key "q" 'quit-window)
+        (local-set-key [f1] 'rails-search-doc)
         (display-buffer (current-buffer)))))
 
 (defun rails-create-tags()
@@ -484,6 +485,11 @@ necessary."
           (lambda ()
             (when (rails-project:root)
               (require 'rails-ruby)
+              (imenu-add-to-menubar "IMENU")
+              (if rails-indent-and-complete
+		(local-set-key (if rails-use-another-define-key
+                                 (kbd "TAB") (kbd "<tab>"))
+			       'indent-and-complete))
               (local-set-key (rails-key "f") '(lambda()
                                                 (interactive)
                                                 (mouse-major-mode-menu (rails-core:menu-position))))

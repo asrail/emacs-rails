@@ -342,8 +342,13 @@ CONTROLLER."
 (defun rails-core:rspec-controller-file (controller)
   "Return the controller spec file name for the controller named
 CONTROLLER."
-  (or (car (rails-core:rspec-controller-files controller))
-      (rails-core:file (format "spec/controllers/%s_controller_spec.rb" (rails-core:file-by-class controller t)))))
+  (when controller
+    (let ((existing (find-if #'file-exists-p (mapcar (lambda (pattern)
+                                                       (rails-core:file (format pattern
+                                                                                (rails-core:file-by-class controller t))))
+                                                     '("spec/requests/%s_spec.rb"
+                                                       "spec/controllers/%s_controller_spec.rb")))))
+      (if existing existing (rails-core:file (format "spec/controllers/%s_controller_spec.rb" (rails-core:file-by-class controller t)))))))
 
 (defun rails-core:lib-file (lib-name)
   "Return the model file from the lib name."
