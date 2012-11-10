@@ -37,6 +37,7 @@
     "test/functional"
     "test/fixtures"
     "spec/controllers"
+    "spec/requests"
     "spec/fixtures"
     "spec/lib"
     "spec/models"
@@ -326,12 +327,23 @@ CONTROLLER."
       controller
     (concat controller "Controller")))
 
+(defun rails-core:rspec-controller-files (controller)
+  "Return the controller spec file name for the controller named
+CONTROLLER."
+  (if controller
+    (remove-if-not #'file-exists-p
+                   (mapcar (lambda (pattern)
+                             (rails-core:file (format pattern
+                                                      (rails-core:file-by-class controller t))))
+                           '("spec/controllers/%s_spec.rb"
+                             "spec/controllers/%s_controller_spec.rb"
+                             "spec/requests/%s_spec.rb")))))
+
 (defun rails-core:rspec-controller-file (controller)
   "Return the controller spec file name for the controller named
 CONTROLLER."
-  (when controller
-    (format "spec/controllers/%s_spec.rb"
-            (rails-core:file-by-class (rails-core:long-controller-name controller) t))))
+  (or (car (rails-core:rspec-controller-files controller))
+      (rails-core:file (format "spec/controllers/%s_controller_spec.rb" (rails-core:file-by-class controller t)))))
 
 (defun rails-core:lib-file (lib-name)
   "Return the model file from the lib name."
@@ -395,7 +407,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
     #'(lambda (controller)
         (string-match "\\(application\\|[a-z0-9_]+_controller\\)\\.rb$"
                       controller))
-    (find-recursive-files "\\.rb$" (rails-core:file "app/controllers/")))))
+    (directory-files-recursive (rails-core:file "app/controllers/") nil "\\.rb$"))))
 
 (defun rails-core:functional-tests ()
   "Return a list of Rails functional tests."
@@ -403,7 +415,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
    #'(lambda(it)
        (remove-postfix (rails-core:class-by-file it)
                        "ControllerTest"))
-   (find-recursive-files "\\.rb$" (rails-core:file "test/functional/"))))
+   (directory-files-recursive (rails-core:file "test/functional/") nil "\\.rb$")))
 
 (defun rails-core:models ()
   "Return a list of Rails models."
@@ -412,7 +424,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
    (delete-if
     #'(lambda (file) (or (rails-core:observer-p file)
                          (rails-core:mailer-p file)))
-    (find-recursive-files "\\.rb$" (rails-core:file "app/models/")))))
+    (directory-files-recursive (rails-core:file "app/models/") nil "\\.rb$"))))
 
 (defun rails-core:unit-tests ()
   "Return a list of Rails functional tests."
@@ -420,7 +432,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
    #'(lambda(it)
        (remove-postfix (rails-core:class-by-file it)
                        "Test"))
-   (find-recursive-files "\\.rb$" (rails-core:file "test/unit/"))))
+   (directory-files-recursive (rails-core:file "test/unit/") nil "\\.rb$")))
 
 (defun rails-core:observers ()
   "Return a list of Rails observers."
@@ -428,13 +440,13 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
    #'(lambda (observer) (replace-regexp-in-string "Observer$" "" observer))
    (mapcar
     #'rails-core:class-by-file
-    (find-recursive-files "\\(_observer\\)\\.rb$" (rails-core:file "app/models/")))))
+    (directory-files-recursive (rails-core:file "app/models/") nil "\\(_observer\\)\\.rb$"))))
 
 (defun rails-core:mailers ()
   "Return a list of Rails mailers."
   (mapcar
    #'rails-core:class-by-file
-   (find-recursive-files "\\(_mailer\\|_notifier\\)\\.rb$" (rails-core:file "app/models/"))))
+   (directory-files-recursive (rails-core:file "app/models/") nil "\\(_mailer\\|_notifier\\)\\.rb$")))
 
 (defun rails-core:helpers ()
   "Return a list of Rails helpers."
@@ -443,7 +455,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
     #'(lambda (helper) (replace-regexp-in-string "Helper$" "" helper))
     (mapcar
      #'rails-core:class-by-file
-     (find-recursive-files "_helper\\.rb$" (rails-core:file "app/helpers/"))))
+     (directory-files-recursive (rails-core:file "app/helpers/") nil "_helper\\.rb$")))
    (list "Test/TestHelper")))
 
 (defun rails-core:migrations (&optional strip-numbers)
@@ -457,7 +469,7 @@ suffix if CUT-CONTOLLER-SUFFIX is non nil."
            (replace-regexp-in-string "^\\([0-9]+\\)" "\\1 " migration))
        (mapcar
         #'rails-core:class-by-file
-        (find-recursive-files "^[0-9]+_.*\\.rb$" (rails-core:file "db/migrate/"))))))
+        (directory-files-recursive (rails-core:file "db/migrate") nil "^[0-9]+_.*\\.rb$")))))
     (if strip-numbers
         (mapcar #'(lambda(i) (car (last (split-string i " "))))
                 migrations)
@@ -484,25 +496,25 @@ of migration."
 
 (defun rails-core:plugin-files (plugin)
   "Return a list of files in specific Rails plugin."
-  (find-recursive-files  "^[^.]" (rails-core:file (concat "vendor/plugins/" plugin))))
+  (directory-files-recursive (rails-core:file (concat "vendor/plugins/" plugin)) nil  "^[^.]"))
 
 (defun rails-core:layouts ()
   "Return a list of Rails layouts."
   (mapcar
    #'(lambda (l)
        (replace-regexp-in-string "\\.[^.]+$" "" l))
-   (find-recursive-files (rails-core:regex-for-match-view) (rails-core:file "app/views/layouts"))))
+   (directory-files-recursive  (rails-core:file "app/views/layouts") nil (rails-core:regex-for-match-view))))
 
 (defun rails-core:fixtures ()
   "Return a list of Rails fixtures."
   (mapcar
    #'(lambda (l)
        (replace-regexp-in-string "\\.[^.]+$" "" l))
-   (find-recursive-files "\\.yml$" (rails-core:file "test/fixtures/"))))
+   (directory-files-recursive (rails-core:file "test/fixtures/") nil "\\.yml$")))
 
 (defun rails-core:configuration-files ()
   "Return a files of files from config folder."
-  (find-recursive-files nil (rails-core:file "config/")))
+  (directory-files-recursive (rails-core:file "config/")))
 
 (defun rails-core:regex-for-match-view ()
   "Return a regex to match Rails view templates.
@@ -546,7 +558,7 @@ If the action is nil, return all views for the controller."
    #'(lambda(it)
        (remove-postfix (rails-core:class-by-file it)
                        "Spec"))
-   (find-recursive-files "\\.rb$" (rails-core:file "spec/controllers/"))))
+   (directory-files-recursive (rails-core:file "spec/controllers/") nil "\\.rb$")))
 
 (defun rails-core:rspec-models ()
   "Return a list of Rails model specs."
@@ -554,14 +566,14 @@ If the action is nil, return all views for the controller."
    #'(lambda(it)
        (remove-postfix (rails-core:class-by-file it)
                        "Spec"))
-   (find-recursive-files "\\.rb$" (rails-core:file "spec/models/"))))
+   (directory-files-recursive (rails-core:file "spec/models/") nil "\\.rb$")))
 
 (defun rails-core:rspec-fixtures ()
   "Return a list of Rails RSpec fixtures."
   (mapcar
    #'(lambda (l)
        (replace-regexp-in-string "\\.[^.]+$" "" l))
-   (find-recursive-files "\\.yml$" (rails-core:file "spec/fixtures/"))))
+   (directory-files-recursive (rails-core:file "spec/fixtures/") nil "\\.yml$")))
 
 ;;;;;;;;;; Getting Controllers/Model/Action from current buffer ;;;;;;;;;;
 
@@ -636,6 +648,65 @@ If the action is nil, return all views for the controller."
   (let ((name (buffer-file-name)))
     (when (string-match "db\\/migrate\\/\\([0-9]+\\)[a-z0-9_]+\.[a-z]+$" name)
       (match-string 1 name))))
+
+(defun rails-core:grep-from-file (file regexp replacement)
+  (and file
+       (file-exists-p file)
+       (with-temp-buffer
+         (insert-file-contents file)
+         (goto-char (point-min))
+         (and (re-search-forward regexp nil t)
+              (match-substitute-replacement replacement)))))
+
+(defun rails-core:grep-from-runner (stmt regexp replacement)
+  (and (rails-core:file "script/runner")
+       (with-temp-buffer
+         (let ((default-directory (rails-project:root)))
+           (shell-command (concat rails-ruby-command " script/runner '" stmt "'")
+                          (current-buffer)
+                          nil)
+           (goto-char (point-min))
+           (and (re-search-forward regexp)
+                (match-substitute-replacement replacement))))))
+
+(defun rails-core:current-rails-version ()
+  "Return the rails version of the current project"
+  (let* ((version-rb-re (concat "MAJOR[[:space:]]+=[[:space:]]+\\([[:digit:]]+\\)"
+                                "[[:space:]]+MINOR[[:space:]]+=[[:space:]]\\([[:digit:]]+\\)"
+                                "[[:space:]]+TINY[[:space:]]+=[[:space:]]\\([[:digit:]]+\\)"))
+         (fns
+          (list
+           (lambda ()
+             (rails-core:grep-from-file (rails-core:file "Gemfile")
+                                        "^gem[[:space:]]+\\(['\"]\\)rails\\1,[[:space:]]+\\1\\(.*?\\)\\1"
+                                        "\\2"))
+           (lambda ()
+             (rails-core:grep-from-file (rails-core:file "config/environment.rb")
+                                        "^RAILS_GEM_VERSION[[:space:]]+=[[:space:]]\\(['\"]\\)\\(.*?\\)\\1"
+                                        "\\2"))
+           (lambda ()
+             (rails-core:grep-from-file (rails-core:file "vendor/rails/railties/lib/rails/version.rb")
+                                        version-rb-re
+                                        "\\1.\\2.\\3"))
+           (lambda ()
+             (rails-core:grep-from-file (rails-core:file "vendor/rails/railties/lib/rails_version.rb")
+                                        version-rb-re
+                                        "\\1.\\2.\\3"))
+           (lambda ()
+             (rails-core:grep-from-runner "puts Rails::VERSION::STRING"
+                                          "^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$"
+                                          "\\&"))))
+         (version nil))
+    (while (and (not version) fns)
+      (setq version (funcall (car fns))
+            fns (cdr fns)))
+    version))
+
+(defun rails-core:current-rails-major-version ()
+  "Return project major version of rails."
+  (let ((version (rails-core:current-rails-version)))
+    (when (string-match "^[0-9]+" version)
+      (string-to-number (match-string 0 version)))))
 
 ;;;;;;;;;; Determination of buffer type ;;;;;;;;;;
 
@@ -794,5 +865,10 @@ the Rails minor mode log."
 (defun rails-core:spec-exist-p ()
   "Return non nil if spec directory is exist."
   (file-exists-p (rails-core:file "spec")))
+
+(defun rails-core:prepare-command (command)
+  (if (and rails-rake-use-bundler-when-possible (file-exists-p (rails-core:file "Gemfile")))
+      (concat "bundle exec " command)
+    command))
 
 (provide 'rails-core)

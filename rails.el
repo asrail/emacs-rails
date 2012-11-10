@@ -27,29 +27,24 @@
 
 ;;; Code:
 
-(unless (<= 22 emacs-major-version)
+(unless (<= 23 emacs-major-version)
   (error
-   (format "emacs-rails require CVS version of Emacs (future Emacs 22), and not be running on your Emacs %s.%s"
+   (format "emacs-rails requires Emacs 24 or newer, and may not work with this Emacs %s.%s"
            emacs-major-version
            emacs-minor-version)))
 
 (eval-when-compile
   (require 'speedbar)
   (require 'inf-ruby)
-  (require 'ruby-mode)
-  (require 'ruby-electric))
+  (require 'ruby-mode))
 
 (require 'grep)
 (require 'sql)
 (require 'ansi-color)
 (require 'etags)
-(require 'find-recursive)
-
-(require 'predictive-prog-mode)
 
 (require 'inflections)
 
-(require 'rails-compat)
 (require 'rails-project)
 
 
@@ -129,11 +124,6 @@ Emacs w3m browser."
   :group 'rails
   :type 'boolean)
 
-(defcustom rails-chm-file nil
-  "Path to CHM documentation file on Windows, or nil."
-  :group 'rails
-  :type 'string)
-
 (defcustom rails-ruby-command "ruby"
   "Ruby preferred command line invocation."
   :group 'rails
@@ -158,26 +148,15 @@ Emacs w3m browser."
   :group 'rails
   :type 'string)
 
-(defcustom rails-enable-ruby-electric t
-  "Indicates whether ruby electric minor mode should be enabled by default for ruby files"
-  :group 'rails
-  :type 'boolean)
-
 (defcustom rails-number-of-lines-shown-when-opening-log-file 130
   "Specifies how many lines to show initially when opening a log file"
   :group 'rails
   :type 'integer)
 
 (defvar rails-version "0.5.99.6")
-(defvar rails-use-another-define-key nil)
 (defvar rails-primary-switch-func nil)
 (defvar rails-secondary-switch-func nil)
 (defvar rails-required-lisp-eval-depth 1000) ; Specifies the minimum required value of max-lisp-eval-depth for rails mode to work
-
-(defcustom rails-indent-and-complete t
-  "Key to indent and complete."
-  :group 'rails
-  :type 'boolean)
 
 (defvar rails-directory<-->types
   '((:controller       "app/controllers/")
@@ -197,6 +176,7 @@ Emacs w3m browser."
     (:fixture          "test/fixtures/")
     (:lib              "lib")
     (:rspec-controller "spec/controllers")
+    (:rspec-controller "spec/requests")
     (:rspec-fixture    "spec/fixtures")
     (:rspec-lib        "spec/lib")
     (:rspec-model      "spec/models")
@@ -224,7 +204,7 @@ Emacs w3m browser."
   :group 'rails
   :type '(repeat string))
 
-(defcustom rails-grep-extensions '("builder" "erb" "haml" "liquid" "mab" "rake" "rb" "rhtml" "rjs" "rxml" "yml" "feature" "js" "html" "rtex" "prawn")
+(defcustom rails-grep-extensions '("builder" "erb" "haml" "liquid" "mab" "rake" "rb" "rhtml" "rjs" "rxml" "yml" "feature" "js" "html" "rtex" "prawn" "coffee" "less" "scss")
   "List of file extensions which grep searches."
   :group 'rails
   :type '(repeat string))
@@ -293,21 +273,16 @@ Emacs w3m browser."
   (unless item
     (setq item (read-string "Search symbol: ")))
   (if item
-      (if (and rails-chm-file
-               (file-exists-p rails-chm-file))
-          (start-process "keyhh" "*keyhh*" "keyhh.exe" "-#klink"
-                         (format "'%s'" item)  rails-chm-file)
-          (with-current-buffer (get-buffer-create "*ri*")            
-            (setq buffer-read-only nil)
-            (erase-buffer)
-            (message (concat "Please wait..."))
-            (call-process rails-ri-command nil "*ri*" t "-T" "-f" "ansi" item)
-            (ansi-color-apply-on-region (point-min) (point-max))
-            (setq buffer-read-only t)
-            (goto-char (point-min))
-            (local-set-key "q" 'quit-window)
-            (local-set-key [f1] 'rails-search-doc)
-            (display-buffer (current-buffer))))))
+      (with-current-buffer (get-buffer-create "*ri*")
+        (setq buffer-read-only nil)
+        (erase-buffer)
+        (message (concat "Please wait..."))
+        (call-process rails-ri-command nil "*ri*" t "-T" "-f" "ansi" item)
+        (ansi-color-apply-on-region (point-min) (point-max))
+        (setq buffer-read-only t)
+        (goto-char (point-min))
+        (local-set-key "q" 'quit-window)
+        (display-buffer (current-buffer)))))
 
 (defun rails-create-tags()
   "Create tags file"
@@ -326,15 +301,10 @@ Emacs w3m browser."
 (defun rails-apply-for-buffer-type ()
  (let* ((type (rails-core:buffer-type))
         (name (substring (symbol-name type) 1))
-        (minor-mode-name (format "rails-%s-minor-mode" name))
-        (minor-mode-abbrev (concat minor-mode-name "-abbrev-table")))
+        (minor-mode-name (format "rails-%s-minor-mode" name)))
    (when (require (intern minor-mode-name) nil t) ;; load new style minor mode rails-*-minor-mode
      (when (fboundp (intern minor-mode-name))
-       (apply (intern minor-mode-name) (list t))
-       (when (boundp (intern minor-mode-abbrev))
-         (merge-abbrev-tables
-          (symbol-value (intern minor-mode-abbrev))
-          local-abbrev-table))))))
+       (apply (intern minor-mode-name) (list t))))))
 
 (defun rails-grep-project (regexp)
   "Find regexp in project."
@@ -493,7 +463,6 @@ necessary."
   nil
   " RoR"
   rails-minor-mode-map
-  (abbrev-mode -1)
   (make-local-variable 'tags-file-name)
   (make-local-variable 'rails-primary-switch-func)
   (make-local-variable 'rails-secondary-switch-func)
@@ -505,6 +474,8 @@ necessary."
                "\\|" (mapconcat (lambda (ext) (concat "\\." ext "$")) rails-refactoring-source-extensions "\\|")
                "\\|" (mapconcat (lambda (ext) (concat "\\." ext "$")) rails-grep-extensions "\\|")
                "\\)"))
+  (set (make-local-variable 'ffip-patterns)
+       (mapcar (lambda (ext) (concat "*." ext)) rails-grep-extensions))
   (rails-features:install))
 
 ;; hooks
@@ -513,21 +484,11 @@ necessary."
           (lambda ()
             (when (rails-project:root)
               (require 'rails-ruby)
-              (require 'ruby-electric)
-              (ruby-electric-mode (or rails-enable-ruby-electric -1))
-              (ruby-hs-minor-mode t)
-              (imenu-add-to-menubar "IMENU")
-              (if rails-indent-and-complete
-		(local-set-key (if rails-use-another-define-key
-                                 (kbd "TAB") (kbd "<tab>"))
-			       'indent-and-complete))
               (local-set-key (rails-key "f") '(lambda()
                                                 (interactive)
                                                 (mouse-major-mode-menu (rails-core:menu-position))))
               (local-set-key (kbd "C-:") 'ruby-toggle-string<>simbol)
-              (local-set-key (if rails-use-another-define-key
-                               (kbd "RET") (kbd "<return>"))
-                             'ruby-newline-and-indent))))
+              (local-set-key (kbd "RET") 'ruby-newline-and-indent))))
 
 (add-hook 'speedbar-mode-hook
           (lambda()
@@ -538,10 +499,6 @@ necessary."
             (rails-project:with-root
              (root)
              (progn
-	       (if rails-indent-and-complete
-		   (local-set-key (if rails-use-another-define-key
-				      (kbd "TAB") (kbd "<tab>"))
-				  'indent-and-complete))
                (rails-minor-mode t)
                (rails-apply-for-buffer-type)))))
 
@@ -557,10 +514,13 @@ necessary."
                                 ("\\.mab$"     . ruby-mode)
                                 ("Rakefile$"   . ruby-mode)
                                 ("Capfile$"    . ruby-mode)
+                                ("Gemfile"     . ruby-mode)
                                 ("\\.rxml$"    . ruby-mode)
                                 ("\\.builder$" . ruby-mode)
                                 ("\\.rjs$"     . ruby-mode)
                                 ("\\.prawn$"   . ruby-mode)
+                                ("\\.scss$"    . css-mode)
+                                ("\\.rabl$"    . ruby-mode)
                                 ("\\.rhtml$"   . rhtml-mode)
                                 ("\\.erb$"     . rhtml-mode)))
 

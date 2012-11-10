@@ -153,54 +153,6 @@ BlaPostfix -> Bla."
   (= (elt word 0)
      (elt (capitalize word) 0)))
 
-;;;;;;;; def-snips stuff ;;;;
-
-(defun snippet-abbrev-function-name (abbrev-table abbrev-name)
-  "Return the name of the snippet abbreviation function in the
-ABBREV-TABLE for the abbreviation ABBREV-NAME."
-  (intern (concat "snippet-abbrev-"
-      (snippet-strip-abbrev-table-suffix
-       (symbol-name abbrev-table))
-      "-"
-      abbrev-name)))
-
-(defun snippet-menu-description-variable (table name)
-  "Return a variable for the menu description of the snippet ABBREV-NAME in ABBREV-TABLE."
-  (intern
-   (concat
-    (symbol-name (snippet-abbrev-function-name table name))
-    "-menu-description")))
-
-(defmacro* def-snips ((&rest abbrev-tables) &rest snips)
-  "Generate snippets with menu documentaion in several ABBREV-TABLES.
-
-  (def-snip (some-mode-abbrev-table other-mode-abbrev-table)
-    (\"abbr\"   \"some snip $${foo}\" \"menu documentation\")
-    (\"anabr\"   \"other snip $${bar}\" \"menu documentation\")
-"
-  `(progn
-     ,@(loop for table in abbrev-tables
-             collect
-             `(snippet-with-abbrev-table ',table
-                                         ,@(loop for (name template desc) in snips collect
-                                                 `(,name . ,template)))
-             append
-             (loop for (name template desc) in snips collect
-                   `(setf ,(snippet-menu-description-variable table name)
-                          ,desc)))))
-
-(defun snippet-menu-description (abbrev-table name)
-  "Return the menu descripton for the snippet named NAME in
-ABBREV-TABLE."
-  (symbol-value (snippet-menu-description-variable abbrev-table name)))
-
-(defun snippet-menu-line (abbrev-table name)
-  "Generate a menu line for the snippet NAME in ABBREV-TABLE."
-  (cons
-   (concat name "\t" (snippet-menu-description abbrev-table name))
-   (lexical-let ((func-name (snippet-abbrev-function-name abbrev-table name)))
-     (lambda () (interactive) (funcall func-name)))))
-
 ;;; Define keys
 
 (defmacro define-keys (key-map &rest key-funcs)
@@ -232,11 +184,17 @@ not exist."
 
 ;; File hierarchy functions
 
-(defun find-recursive-files (file-regexp directory)
-  "Return a list of files, found in DIRECTORY and match them to FILE-REGEXP."
-  (find-recursive-filter-out
-   find-recursive-exclude-files
-   (find-recursive-directory-relative-files directory "" file-regexp)))
+(defun directory-files-recursive (directory &optional full match nosort base)
+  "Like `directory-files' but traversed recursively."
+  (apply #'append
+         (mapcar (lambda (file)
+                   (cond ((and (file-regular-p (concat directory "/" file))
+                               (or (not match) (string-match match file)))
+                          (list (concat base file)))
+                         ((and (file-directory-p (concat directory "/" file))
+                               (not (string-match "^\\." file)))
+                          (directory-files-recursive (concat directory "/" file) full match nosort (concat base file "/")))))
+                 (ignore-errors (directory-files directory full nil nosort)))))
 
 (defun directory-name (path)
   "Return the name of a directory with a given path.
@@ -281,7 +239,8 @@ it."
     (buffer-string)))
 
 (defun buffer-visible-p (buffer-name)
-  (if (get-buffer-window buffer-name) t nil))
+  "Return t when BUFFER-NAME is visible in any frame."
+  (if (get-buffer-window buffer-name t) t nil))
 
 ;; Misc
 
@@ -299,25 +258,6 @@ the user explicit sets `rails-use-alternative-browse-url'."
   (if (and (eq system-type 'windows-nt) rails-use-alternative-browse-url)
       (w32-shell-execute "open" "iexplore" url)
     (browse-url url args)))
-
-;; abbrev
-;; from http://www.opensource.apple.com/darwinsource/Current/emacs-59/emacs/lisp/derived.el
-(defun merge-abbrev-tables (old new)
-  "Merge an old abbrev table into a new one.
-This function requires internal knowledge of how abbrev tables work,
-presuming that they are obarrays with the abbrev as the symbol, the expansion
-as the value of the symbol, and the hook as the function definition."
-  (when old
-    (mapatoms
-     (lambda(it)
-       (or (intern-soft (symbol-name it) new)
-           (define-abbrev new
-             (symbol-name it)
-             (symbol-value it)
-             (symbol-function it)
-             nil
-             t)))
-     old)))
 
 ;; Colorize
 
